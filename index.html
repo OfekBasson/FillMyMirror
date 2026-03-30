@@ -3,488 +3,655 @@
 <head>
   <meta charset="utf-8">
   <meta name="description"
-        content="Deformable Neural Radiance Fields creates free-viewpoint portraits (nerfies) from casually captured videos.">
-  <meta name="keywords" content="Nerfies, D-NeRF, NeRF">
+        content="Fill My Mirror: a training-free method for geometry-aware mirror inpainting that produces geometrically consistent reflections by projecting visible scene content into the mirror region.">
+  <meta name="keywords" content="mirror inpainting, geometry-aware, diffusion models, image editing, reflection synthesis">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Nerfies: Deformable Neural Radiance Fields</title>
+  <title>Fill My Mirror: Geometry-Constrained Mirror Inpainting</title>
 
-  <!-- Global site tag (gtag.js) - Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-
-    function gtag() {
-      dataLayer.push(arguments);
-    }
-
-    gtag('js', new Date());
-
-    gtag('config', 'G-PYVRSFMDRL');
-  </script>
-
-  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
-        rel="stylesheet">
-
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
   <link rel="stylesheet" href="./static/css/bulma.min.css">
-  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
-  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
   <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
   <link rel="stylesheet" href="./static/css/index.css">
   <link rel="icon" href="./static/images/favicon.svg">
 
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <script defer src="./static/js/fontawesome.all.min.js"></script>
-  <script src="./static/js/bulma-carousel.min.js"></script>
-  <script src="./static/js/bulma-slider.min.js"></script>
-  <script src="./static/js/index.js"></script>
+
+  <style>
+    /* ── General ─────────────────────────────────────── */
+    body { font-family: 'Noto Sans', sans-serif; }
+
+    .publication-title { font-family: 'Google Sans', sans-serif; }
+
+    .section-alt { background: #f8f8f8; }
+
+    /* ── Method steps ────────────────────────────────── */
+    .method-step {
+      background: #f2f2f2;
+      border-radius: 10px;
+      padding: 1.5rem;
+      height: 100%;
+    }
+    .step-number {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #3273dc;
+      line-height: 1;
+      margin-bottom: .4rem;
+    }
+
+    /* ── 4-Quadrant Comparison Widget ────────────────── */
+    .quad-wrapper {
+      position: relative;
+      cursor: crosshair;
+      user-select: none;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    }
+    /* invisible spacer keeps the container's height */
+    .quad-wrapper .quad-spacer {
+      visibility: hidden;
+      width: 100%;
+      display: block;
+      position: relative;
+    }
+    /* all 4 comparison images are always stacked; clip-path controls visibility */
+    .quad-wrapper .q-img {
+      display: block;
+      width: 100%;
+      position: absolute;
+      top: 0; left: 0;
+      pointer-events: none;
+      will-change: clip-path;
+    }
+
+    /* crosshair overlay — lines follow mouse */
+    .quad-crosshair {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .quad-wrapper:hover .quad-crosshair { opacity: 1; }
+
+    .quad-crosshair .ch-hline {
+      position: absolute;
+      left: 0; width: 100%; height: 1px;
+      background: rgba(255,255,255,0.7);
+      top: 50%; /* updated by JS */
+    }
+    .quad-crosshair .ch-vline {
+      position: absolute;
+      top: 0; height: 100%; width: 1px;
+      background: rgba(255,255,255,0.7);
+      left: 50%; /* updated by JS */
+    }
+
+    /* corner labels — fixed in corners */
+    .quad-crosshair .ql {
+      position: absolute;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      padding: 3px 7px;
+      border-radius: 4px;
+      color: #fff;
+      backdrop-filter: blur(4px);
+    }
+    .ql.tl { top: 8px;    left: 8px;  background: rgba(30,130,80,.85); }
+    .ql.tr { top: 8px;    right: 8px; background: rgba(40,40,40,.75); }
+    .ql.bl { bottom: 8px; left: 8px;  background: rgba(30,80,160,.85); }
+    .ql.br { bottom: 8px; right: 8px; background: rgba(160,80,0,.85); }
+
+    /* ── Results grid ────────────────────────────────── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.4rem;
+    }
+    .result-card {
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,.12);
+    }
+    .result-card .card-caption {
+      background: #fff;
+      padding: .5rem .75rem;
+      font-size: 0.78rem;
+      color: #444;
+      line-height: 1.4;
+    }
+
+    /* ── Metric table ────────────────────────────────── */
+    .table.metric-table th, .table.metric-table td { text-align: center; vertical-align: middle !important; }
+    .metric-table thead th { background: #f0f0f0; }
+    .metric-table tr.ours-row { font-weight: 700; background: #f0fff4 !important; }
+
+    /* ── Placeholder boxes ───────────────────────────── */
+    .placeholder-box {
+      background: rgba(0,0,0,.04);
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 3rem 2rem;
+      color: #888;
+      text-align: center;
+      font-size: .9rem;
+    }
+
+    /* ── Legend ──────────────────────────────────────── */
+    .quad-legend {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: .75rem;
+      font-size: .82rem;
+    }
+    .quad-legend .leg-item {
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+    }
+    .leg-dot {
+      width: 12px; height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .leg-original { background: rgba(40,40,40,.7); }
+    .leg-ours     { background: rgba(30,130,80,.8); }
+    .leg-qwen     { background: rgba(30,80,160,.8); }
+    .leg-flux     { background: rgba(160,80,0,.8); }
+  </style>
 </head>
 <body>
 
+<!-- ─────────────────────── NAVBAR ─────────────────────── -->
 <nav class="navbar" role="navigation" aria-label="main navigation">
   <div class="navbar-brand">
     <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
     </a>
-  </div>
-  <div class="navbar-menu">
-    <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
-      <a class="navbar-item" href="https://keunhong.com">
-      <span class="icon">
-          <i class="fas fa-home"></i>
-      </span>
-      </a>
-
-      <div class="navbar-item has-dropdown is-hoverable">
-        <a class="navbar-link">
-          More Research
-        </a>
-        <div class="navbar-dropdown">
-          <a class="navbar-item" href="https://hypernerf.github.io">
-            HyperNeRF
-          </a>
-          <a class="navbar-item" href="https://nerfies.github.io">
-            Nerfies
-          </a>
-          <a class="navbar-item" href="https://latentfusion.github.io">
-            LatentFusion
-          </a>
-          <a class="navbar-item" href="https://photoshape.github.io">
-            PhotoShape
-          </a>
-        </div>
-      </div>
-    </div>
-
   </div>
 </nav>
 
 
+<!-- ─────────────────────── HERO ─────────────────────── -->
 <section class="hero">
   <div class="hero-body">
     <div class="container is-max-desktop">
       <div class="columns is-centered">
         <div class="column has-text-centered">
-          <h1 class="title is-1 publication-title">Nerfies: Deformable Neural Radiance Fields</h1>
-          <div class="is-size-5 publication-authors">
-            <span class="author-block">
-              <a href="https://keunhong.com">Keunhong Park</a><sup>1</sup>,</span>
-            <span class="author-block">
-              <a href="https://utkarshsinha.com">Utkarsh Sinha</a><sup>2</sup>,</span>
-            <span class="author-block">
-              <a href="https://jonbarron.info">Jonathan T. Barron</a><sup>2</sup>,
-            </span>
-            <span class="author-block">
-              <a href="http://sofienbouaziz.com">Sofien Bouaziz</a><sup>2</sup>,
-            </span>
-            <span class="author-block">
-              <a href="https://www.danbgoldman.com">Dan B Goldman</a><sup>2</sup>,
-            </span>
-            <span class="author-block">
-              <a href="https://homes.cs.washington.edu/~seitz/">Steven M. Seitz</a><sup>1,2</sup>,
-            </span>
-            <span class="author-block">
-              <a href="http://www.ricardomartinbrualla.com">Ricardo Martin-Brualla</a><sup>2</sup>
-            </span>
-          </div>
 
-          <div class="is-size-5 publication-authors">
-            <span class="author-block"><sup>1</sup>University of Washington,</span>
-            <span class="author-block"><sup>2</sup>Google Research</span>
+          <span class="tag is-dark is-medium mb-4" style="background:#1a1a2e; font-weight:600;">ECCV 2026</span>
+
+          <h1 class="title is-1 publication-title">
+            Fill My Mirror
+            <br><span style="font-size:.72em; font-weight:500;">Geometry-Constrained Mirror Inpainting</span>
+          </h1>
+
+          <!--
+            AUTHORS — uncomment and fill in once the paper is de-anonymized:
+          <div class="is-size-5 publication-authors mb-2">
+            <span class="author-block"><a href="#">Author One</a><sup>1</sup>, </span>
+            <span class="author-block"><a href="#">Author Two</a><sup>1</sup>, </span>
+            <span class="author-block"><a href="#">Author Three</a><sup>1</sup></span>
           </div>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>Your Institution</span>
+          </div>
+          -->
 
           <div class="column has-text-centered">
             <div class="publication-links">
-              <!-- PDF Link. -->
               <span class="link-block">
-                <a href="https://arxiv.org/pdf/2011.12948"
+                <a href="./static/paper.pdf"
                    class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                      <i class="fas fa-file-pdf"></i>
-                  </span>
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
                   <span>Paper</span>
                 </a>
               </span>
               <span class="link-block">
-                <a href="https://arxiv.org/abs/2011.12948"
-                   class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                      <i class="ai ai-arxiv"></i>
-                  </span>
-                  <span>arXiv</span>
+                <a href="#"
+                   class="external-link button is-normal is-rounded is-dark" style="opacity:.6; pointer-events:none;">
+                  <span class="icon"><i class="fab fa-github"></i></span>
+                  <span>Code (coming soon)</span>
                 </a>
               </span>
-              <!-- Video Link. -->
-              <span class="link-block">
-                <a href="https://www.youtube.com/watch?v=MrKrnHhk8IA"
-                   class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                      <i class="fab fa-youtube"></i>
-                  </span>
-                  <span>Video</span>
-                </a>
-              </span>
-              <!-- Code Link. -->
-              <span class="link-block">
-                <a href="https://github.com/google/nerfies"
-                   class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                      <i class="fab fa-github"></i>
-                  </span>
-                  <span>Code</span>
-                  </a>
-              </span>
-              <!-- Dataset Link. -->
-              <span class="link-block">
-                <a href="https://github.com/google/nerfies/releases/tag/0.1"
-                   class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                      <i class="far fa-images"></i>
-                  </span>
-                  <span>Data</span>
-                  </a>
             </div>
-
           </div>
+
         </div>
       </div>
     </div>
   </div>
 </section>
 
+
+<!-- ─────────────────────── TEASER ─────────────────────── -->
 <section class="hero teaser">
   <div class="container is-max-desktop">
     <div class="hero-body">
-      <video id="teaser" autoplay muted loop playsinline height="100%">
-        <source src="./static/videos/teaser.mp4"
-                type="video/mp4">
-      </video>
-      <h2 class="subtitle has-text-centered">
-        <span class="dnerf">Nerfies</span> turns selfie videos from your phone into
-        free-viewpoint
-        portraits.
+      <img src="./static/images/teaser.jpg" alt="Teaser" style="width:100%; border-radius:8px;">
+      <h2 class="subtitle has-text-centered mt-4">
+        <strong>Fill My Mirror</strong> generates geometrically consistent mirror reflections
+        by projecting visible scene content into the mirror, then completing remaining areas
+        with a two-mask diffusion strategy — entirely training-free.
       </h2>
     </div>
   </div>
 </section>
 
 
-<section class="hero is-light is-small">
-  <div class="hero-body">
-    <div class="container">
-      <div id="results-carousel" class="carousel results-carousel">
-        <div class="item item-steve">
-          <video poster="" id="steve" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/steve.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-chair-tp">
-          <video poster="" id="chair-tp" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/chair-tp.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-shiba">
-          <video poster="" id="shiba" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/shiba.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-fullbody">
-          <video poster="" id="fullbody" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/fullbody.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-blueshirt">
-          <video poster="" id="blueshirt" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/blueshirt.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-mask">
-          <video poster="" id="mask" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/mask.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-coffee">
-          <video poster="" id="coffee" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/coffee.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-toby">
-          <video poster="" id="toby" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/toby2.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
+<!-- ─────────────────────── ABSTRACT ─────────────────────── -->
 <section class="section">
   <div class="container is-max-desktop">
-    <!-- Abstract. -->
     <div class="columns is-centered has-text-centered">
       <div class="column is-four-fifths">
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
           <p>
-            We present the first method capable of photorealistically reconstructing a non-rigidly
-            deforming scene using photos/videos captured casually from mobile phones.
+            Mirrors frequently appear in images generated by modern generative models, yet producing geometrically consistent reflections remains an open challenge. Unlike most objects, mirror appearance is entirely determined by scene geometry and viewpoint, making reflections difficult to synthesize using learned appearance priors alone. We address this problem in the setting of mirror inpainting, where the surrounding scene is fixed and only the mirror region must be generated.
           </p>
           <p>
-            Our approach augments neural radiance fields
-            (NeRF) by optimizing an
-            additional continuous volumetric deformation field that warps each observed point into a
-            canonical 5D NeRF.
-            We observe that these NeRF-like deformation fields are prone to local minima, and
-            propose a coarse-to-fine optimization method for coordinate-based models that allows for
-            more robust optimization.
-            By adapting principles from geometry processing and physical simulation to NeRF-like
-            models, we propose an elastic regularization of the deformation field that further
-            improves robustness.
+            Our key insight is that much of the mirror content is geometrically constrained by the visible scene and therefore does not need to be hallucinated. We estimate scene geometry and project visible content into the mirror to recover reflection regions that are deterministically determined by geometry. A generative model is then applied to complete the mirror region using a two-mask diffusion strategy that balances geometry-preserving constraints with the model's learned priors, reducing projection artifacts and improving reflection consistency. The method is <b>training-free</b> and applicable to complex real-world scenes.
           </p>
           <p>
-            We show that <span class="dnerf">Nerfies</span> can turn casually captured selfie
-            photos/videos into deformable NeRF
-            models that allow for photorealistic renderings of the subject from arbitrary
-            viewpoints, which we dub <i>"nerfies"</i>. We evaluate our method by collecting data
-            using a
-            rig with two mobile phones that take time-synchronized photos, yielding train/validation
-            images of the same pose at different viewpoints. We show that our method faithfully
-            reconstructs non-rigidly deforming scenes and reproduces unseen views with high
-            fidelity.
+            We evaluate our approach on synthetic scenes and on real captured images. Using standard metrics and a newly introduced geometry-aware reflection consistency evaluation, we show that explicitly incorporating scene geometry leads to more consistent and perceptually preferred mirrors.
           </p>
         </div>
       </div>
     </div>
-    <!--/ Abstract. -->
-
-    <!-- Paper video. -->
-    <div class="columns is-centered has-text-centered">
-      <div class="column is-four-fifths">
-        <h2 class="title is-3">Video</h2>
-        <div class="publication-video">
-          <iframe src="https://www.youtube.com/embed/MrKrnHhk8IA?rel=0&amp;showinfo=0"
-                  frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-        </div>
-      </div>
-    </div>
-    <!--/ Paper video. -->
   </div>
 </section>
 
 
+<!-- ─────────────────────── METHOD ─────────────────────── -->
+<section class="section section-alt">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Method</h2>
+
+    <!-- Pipeline figure -->
+    <div class="columns is-centered mb-5">
+      <div class="column has-text-centered">
+        <img src="./static/images/pipeline.png" alt="Method Pipeline" style="width:100%; border-radius:8px;">
+        <p class="has-text-centered mt-2" style="font-size:.88rem; color:#555;">
+          A monocular geometry estimator reconstructs a 3D mesh. Visible scene
+          content is reflected across the estimated mirror plane and rendered back onto the mirror region.
+          During diffusion inpainting, two complementary masks drive geometry-constrained and generative
+          noise predictions, which are interpolated at each timestep.
+        </p>
+      </div>
+    </div>
+
+    <!-- Three steps -->
+    <div class="columns is-variable is-5">
+      <div class="column">
+        <div class="method-step">
+          <div class="step-number">01</div>
+          <h3 class="title is-5 mt-2">Geometry Estimation &amp; Projection</h3>
+          <p>We use MoGe-v2 to reconstruct a 3D mesh and camera parameters from the single input image.
+          The mirror plane is estimated by fitting a plane to the masked region. The scene is then
+          reflected across this plane and rendered — recovering every mirror pixel whose content is
+          deterministically constrained by scene geometry.</p>
+        </div>
+      </div>
+      <div class="column">
+        <div class="method-step">
+          <div class="step-number">02</div>
+          <h3 class="title is-5 mt-2">Two-Mask Decomposition</h3>
+          <p>Projection is imperfect: occlusions and depth errors leave some pixels uncertain. We define
+          two masks — a <em>geometry constraint mask</em> (projected pixels) and a <em>generative
+          refinement mask</em> (full mirror) — encoding complementary information for the diffusion
+          model's two parallel noise predictions.</p>
+        </div>
+      </div>
+      <div class="column">
+        <div class="method-step">
+          <div class="step-number">03</div>
+          <h3 class="title is-5 mt-2">Noise Interpolation</h3>
+          <p>At each denoising step, the two noise predictions are interpolated with a time-varying
+          schedule: early steps rely on the geometry constraint mask (global structure), late steps
+          lean on the generative mask (appearance details). The result is physically consistent and
+          visually realistic — without any retraining.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────── RESULTS ─────────────────────── -->
 <section class="section">
   <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Qualitative Results</h2>
 
-    <div class="columns is-centered">
-
-      <!-- Visual Effects. -->
-      <div class="column">
-        <div class="content">
-          <h2 class="title is-3">Visual Effects</h2>
-          <p>
-            Using <i>nerfies</i> you can create fun visual effects. This Dolly zoom effect
-            would be impossible without nerfies since it would require going through a wall.
-          </p>
-          <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
-            <source src="./static/videos/dollyzoom-stacked.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-      </div>
-      <!--/ Visual Effects. -->
-
-      <!-- Matting. -->
-      <div class="column">
-        <h2 class="title is-3">Matting</h2>
-        <div class="columns is-centered">
-          <div class="column content">
-            <p>
-              As a byproduct of our method, we can also solve the matting problem by ignoring
-              samples that fall outside of a bounding box during rendering.
-            </p>
-            <video id="matting-video" controls playsinline height="100%">
-              <source src="./static/videos/matting.mp4"
-                      type="video/mp4">
-            </video>
-          </div>
-
-        </div>
-      </div>
+    <div class="content has-text-centered mb-4">
+      <p>
+        Move your mouse over each image to compare methods.
+        The image is divided into four quadrants — hover each corner to reveal the corresponding output.
+      </p>
     </div>
-    <!--/ Matting. -->
 
-    <!-- Animation. -->
-    <div class="columns is-centered">
-      <div class="column is-full-width">
-        <h2 class="title is-3">Animation</h2>
-
-        <!-- Interpolating. -->
-        <h3 class="title is-4">Interpolating states</h3>
-        <div class="content has-text-justified">
-          <p>
-            We can also animate the scene by interpolating the deformation latent codes of two input
-            frames. Use the slider here to linearly interpolate between the left frame and the right
-            frame.
-          </p>
-        </div>
-        <div class="columns is-vcentered interpolation-panel">
-          <div class="column is-3 has-text-centered">
-            <img src="./static/images/interpolate_start.jpg"
-                 class="interpolation-image"
-                 alt="Interpolate start reference image."/>
-            <p>Start Frame</p>
-          </div>
-          <div class="column interpolation-video-column">
-            <div id="interpolation-image-wrapper">
-              Loading...
-            </div>
-            <input class="slider is-fullwidth is-large is-info"
-                   id="interpolation-slider"
-                   step="1" min="0" max="100" value="0" type="range">
-          </div>
-          <div class="column is-3 has-text-centered">
-            <img src="./static/images/interpolate_end.jpg"
-                 class="interpolation-image"
-                 alt="Interpolation end reference image."/>
-            <p class="is-bold">End Frame</p>
-          </div>
-        </div>
-        <br/>
-        <!--/ Interpolating. -->
-
-        <!-- Re-rendering. -->
-        <h3 class="title is-4">Re-rendering the input video</h3>
-        <div class="content has-text-justified">
-          <p>
-            Using <span class="dnerf">Nerfies</span>, you can re-render a video from a novel
-            viewpoint such as a stabilized camera by playing back the training deformations.
-          </p>
-        </div>
-        <div class="content has-text-centered">
-          <video id="replay-video"
-                 controls
-                 muted
-                 preload
-                 playsinline
-                 width="75%">
-            <source src="./static/videos/replay.mp4"
-                    type="video/mp4">
-          </video>
-        </div>
-        <!--/ Re-rendering. -->
-
-      </div>
+    <!-- Legend -->
+    <div class="quad-legend mb-5">
+      <span class="leg-item"><span class="leg-dot leg-ours"></span> Top-left: <strong>Ours</strong> | </span>
+      <span class="leg-item"><span class="leg-dot leg-original"></span> Top-right: Ground Truth | </span>
+      <span class="leg-item"><span class="leg-dot leg-qwen"></span> Bottom-left: Qwen-Image-Edit | </span>
+      <span class="leg-item"><span class="leg-dot leg-flux"></span> Bottom-right: FLUX.1 Fill</span>
     </div>
-    <!--/ Animation. -->
 
-
-    <!-- Concurrent Work. -->
-    <div class="columns is-centered">
-      <div class="column is-full-width">
-        <h2 class="title is-3">Related Links</h2>
-
-        <div class="content has-text-justified">
-          <p>
-            There's a lot of excellent work that was introduced around the same time as ours.
-          </p>
-          <p>
-            <a href="https://arxiv.org/abs/2104.09125">Progressive Encoding for Neural Optimization</a> introduces an idea similar to our windowed position encoding for coarse-to-fine optimization.
-          </p>
-          <p>
-            <a href="https://www.albertpumarola.com/research/D-NeRF/index.html">D-NeRF</a> and <a href="https://gvv.mpi-inf.mpg.de/projects/nonrigid_nerf/">NR-NeRF</a>
-            both use deformation fields to model non-rigid scenes.
-          </p>
-          <p>
-            Some works model videos with a NeRF by directly modulating the density, such as <a href="https://video-nerf.github.io/">Video-NeRF</a>, <a href="https://www.cs.cornell.edu/~zl548/NSFF/">NSFF</a>, and <a href="https://neural-3d-video.github.io/">DyNeRF</a>
-          </p>
-          <p>
-            There are probably many more by the time you are reading this. Check out <a href="https://dellaert.github.io/NeRF/">Frank Dellart's survey on recent NeRF papers</a>, and <a href="https://github.com/yenchenlin/awesome-NeRF">Yen-Chen Lin's curated list of NeRF papers</a>.
-          </p>
-        </div>
-      </div>
+    <div class="results-grid" id="results-grid">
+      <!-- Populated by JS below -->
     </div>
-    <!--/ Concurrent Work. -->
 
   </div>
 </section>
 
 
+<!-- ─────────────────────── QUANTITATIVE ─────────────────────── -->
+<section class="section section-alt">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Quantitative Results</h2>
+
+    <!-- Table 1 -->
+    <h3 class="title is-4 mt-4">Synthetic Scenes — with Ground-Truth Geometry</h3>
+    <p class="mb-3" style="font-size:.9rem;">
+      Evaluated over the full image, all mirror pixels, and the <em>geometrically constrained</em>
+      mirror subset. Upper block: no GT geometry at inference. Lower block: GT geometry used.
+    </p>
+    <div class="table-container">
+      <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth metric-table">
+        <thead>
+          <tr>
+            <th rowspan="2">Method</th>
+            <th rowspan="2">Geometry Source</th>
+            <th>Full Image</th>
+            <th colspan="3">Full Mirror</th>
+            <th colspan="3">Constrained Mirror Pixels</th>
+          </tr>
+          <tr>
+            <th>CLIP↑</th>
+            <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
+            <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Qwen-Image-Edit</td><td>✗</td>
+            <td>0.30</td><td>13.70</td><td>0.51</td><td>0.06</td><td>14.11</td><td>0.51</td><td>0.04</td>
+          </tr>
+          <tr>
+            <td>FLUX.1 Fill</td><td>✗</td>
+            <td>0.31</td><td>13.61</td><td>0.51</td><td>0.07</td><td>14.38</td><td>0.51</td><td>0.04</td>
+          </tr>
+          <tr class="ours-row">
+            <td>Ours</td><td>Est.</td>
+            <td>0.30</td><td><b>14.74</b></td><td><b>0.54</b></td><td><b>0.05</b></td>
+            <td><b>14.89</b></td><td><b>0.54</b></td><td><b>0.03</b></td>
+          </tr>
+          <tr style="border-top:2px solid #bbb;">
+            <td>MirrorFusion 2.0</td><td>GT</td>
+            <td>0.31</td><td>10.60</td><td>0.32</td><td>0.10</td><td>10.00</td><td>0.30</td><td>0.07</td>
+          </tr>
+          <tr>
+            <td>Qwen-Image-Edit</td><td>GT</td>
+            <td>0.30</td><td>13.36</td><td>0.54</td><td>0.06</td><td>13.88</td><td>0.54</td><td>0.04</td>
+          </tr>
+          <tr class="ours-row">
+            <td>Ours</td><td>GT</td>
+            <td>0.30</td><td><b>17.14</b></td><td><b>0.64</b></td><td><b>0.05</b></td>
+            <td><b>18.39</b></td><td><b>0.67</b></td><td><b>0.03</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Table 2 -->
+    <h3 class="title is-4 mt-6">Real Images — no Ground-Truth Geometry</h3>
+    <p class="mb-3" style="font-size:.9rem;">
+      Constrained mirror pixels are identified via our Reflection Consistency Score (RCS).
+    </p>
+    <div class="table-container">
+      <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth metric-table">
+        <thead>
+          <tr>
+            <th rowspan="2">Method</th>
+            <th>Full Image</th>
+            <th colspan="3">Full Mirror</th>
+            <th colspan="3">Constrained Mirror Pixels (RCS)</th>
+          </tr>
+          <tr>
+            <th>CLIP↑</th>
+            <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
+            <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>MirrorFusion 2.0</td>
+            <td>0.30</td><td>9.22</td><td>0.32</td><td>0.14</td><td>9.98</td><td>0.33</td><td>0.06</td>
+          </tr>
+          <tr>
+            <td>Qwen-Image-Edit</td>
+            <td>0.30</td><td>12.83</td><td>0.49</td><td>0.10</td><td>13.44</td><td>0.48</td><td>0.04</td>
+          </tr>
+          <tr>
+            <td>FLUX.1 Fill</td>
+            <td>0.31</td><td>13.31</td><td>0.48</td><td>0.11</td><td>13.68</td><td>0.46</td><td>0.04</td>
+          </tr>
+          <tr>
+            <td>Ours (no interp.)</td>
+            <td>0.30</td><td>13.61</td><td>0.50</td><td>0.11</td><td>14.50</td><td>0.50</td><td>0.04</td>
+          </tr>
+          <tr class="ours-row">
+            <td>Ours</td>
+            <td>0.30</td><td><b>13.66</b></td><td><b>0.50</b></td><td>0.11</td>
+            <td><b>14.54</b></td><td><b>0.50</b></td><td>0.04</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ─────────────────────── RCS ─────────────────────── -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Reflection Consistency Score</h2>
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+        <div class="content has-text-justified">
+          <p>
+            Standard metrics evaluate all mirror pixels equally, but many pixels have no unique
+            correct answer — they reflect parts of the scene not visible from the camera. We propose
+            the <strong>Reflection Consistency Score (RCS)</strong>, an evaluation protocol that
+            isolates only those mirror pixels whose appearance is <em>geometrically constrained</em>
+            by the visible scene, enabling meaningful pixel-level comparison on real images without
+            ground-truth depth.
+          </p>
+          <p>
+            We decompose the image into a scene view and a horizontally-flipped mirror view, then use
+            <strong>MASt3R</strong> to estimate dense correspondences between the two. Mirror pixels
+            with valid correspondences are dilated to form the evaluation mask. On synthetic scenes,
+            the estimated mask achieves mean IoU&nbsp;<strong>0.71</strong> against ground-truth
+            constrained masks, with <strong>88%</strong> precision and <strong>81%</strong> recall.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RCS figure -->
+    <div class="columns is-centered mt-4">
+      <div class="column has-text-centered">
+        <img src="./static/images/rcs.png" alt="RCS Overview" style="width:100%; border-radius:8px;">
+        <p class="has-text-centered mt-2" style="font-size:.88rem; color:#555;">
+          MASt3R finds correspondences between the scene view and the
+          horizontally-flipped mirror view. Matched pixels are dilated to form the constraint mask
+          used for evaluation.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─────────────────────── BIBTEX ─────────────────────── -->
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
     <h2 class="title">BibTeX</h2>
-    <pre><code>@article{park2021nerfies,
-  author    = {Park, Keunhong and Sinha, Utkarsh and Barron, Jonathan T. and Bouaziz, Sofien and Goldman, Dan B and Seitz, Steven M. and Martin-Brualla, Ricardo},
-  title     = {Nerfies: Deformable Neural Radiance Fields},
-  journal   = {ICCV},
-  year      = {2021},
+    <pre><code>@inproceedings{fillmymirror2026,
+  title     = {Fill My Mirror: Geometry-Constrained Mirror Inpainting},
+  author    = {Anonymous Authors},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year      = {2026},
 }</code></pre>
   </div>
 </section>
 
 
+<!-- ─────────────────────── FOOTER ─────────────────────── -->
 <footer class="footer">
   <div class="container">
-    <div class="content has-text-centered">
-      <a class="icon-link"
-         href="./static/videos/nerfies_paper.pdf">
-        <i class="fas fa-file-pdf"></i>
-      </a>
-      <a class="icon-link" href="https://github.com/keunhong" class="external-link" disabled>
-        <i class="fab fa-github"></i>
-      </a>
-    </div>
     <div class="columns is-centered">
-      <div class="column is-8">
-        <div class="content">
-          <p>
-            This website is licensed under a <a rel="license"
-                                                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
-            Commons Attribution-ShareAlike 4.0 International License</a>.
-          </p>
-          <p>
-            This means you are free to borrow the <a
-              href="https://github.com/nerfies/nerfies.github.io">source code</a> of this website,
-            we just ask that you link back to this page in the footer.
-            Please remember to remove the analytics code included in the header of the website which
-            you do not want on your website.
-          </p>
-        </div>
+      <div class="column is-8 has-text-centered">
+        <p style="font-size:.85rem; color:#888;">
+          Website template adapted from
+          <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>,
+          licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
+        </p>
       </div>
     </div>
   </div>
 </footer>
+
+
+<!-- ─────────────────────── SCRIPTS ─────────────────────── -->
+<script>
+// ── Scene data ────────────────────────────────────────────────
+const SCENES = [
+  { id: "scene01", caption: "A bed with white bedding is reflected in a standing mirror beside sheer curtains",                                                                            initX: 77, initY: 50 },
+  { id: "scene02", caption: "A mirror above 2 sinks reflects a blue bathroom door in a public toilet",                                                                                    initX: 90, initY: 44 },
+  { id: "scene03", caption: "A mirror door reflects a Kenneth Cole store display and the interior of a shopping mall",                                                                     initX: 25, initY: 35 },
+  { id: "scene04", caption: "A mirror near a marble table reflects a wooden wardrobe, black trash bin. The mirror is in a room with a closed door",                                        initX: 86, initY: 50 },
+  { id: "scene05", caption: "A mirror reflects a blue chair, dumbbells, boxes, a rug, and a stuffed toy",                                                                                  initX: 70, initY: 45 },
+  { id: "scene07", caption: "A mirror reflects a wicker basket with a black bag on it, and above it a wall shelf with plants and a portable air conditioner",                              initX: 80, initY: 32 },
+  { id: "scene08", caption: "A mirror reflects a wooden cabinet and candles, in a room with wall art and chair",                                                                            initX: 65, initY: 59 },
+  { id: "scene09", caption: "A mirror reflects towels and a window, in a room with toilet, plant, toiletries, toothbrushes, and a watch holder",                                          initX: 85, initY: 50 },
+  { id: "scene12", caption: "A rectangular mirror near shelves of eyeglasses reflects lights and image in an eyewear store",                                                               initX: 47, initY: 42 },
+  { id: "scene14", caption: "Large cardboard barrels are reflected in a wall mirror near a door which stands below a plant and cups",                                                      initX: 84, initY: 64 },
+];
+
+// Quadrant layout (positions relative to mouse):
+//   TL = above-left  → Ours          (file: ours)
+//   TR = above-right → Ground Truth  (file: original)
+//   BL = below-left  → Qwen          (file: qwen)
+//   BR = below-right → FLUX.1 Fill   (file: flux)
+const QUADS = [
+  { file: "ours",     label: "Ours",          pos: "tl" },
+  { file: "original", label: "Ground Truth",  pos: "tr" },
+  { file: "qwen",     label: "Qwen",          pos: "bl" },
+  { file: "flux",     label: "FLUX.1 Fill",   pos: "br" },
+];
+
+// clip-path for each quadrant given mouse position (px, py) as percentages
+function clips(px, py) {
+  return [
+    // TL: 0,0  → px,0  → px,py  → 0,py
+    `polygon(0% 0%, ${px}% 0%, ${px}% ${py}%, 0% ${py}%)`,
+    // TR: px,0 → 100,0 → 100,py → px,py
+    `polygon(${px}% 0%, 100% 0%, 100% ${py}%, ${px}% ${py}%)`,
+    // BL: 0,py → px,py → px,100 → 0,100
+    `polygon(0% ${py}%, ${px}% ${py}%, ${px}% 100%, 0% 100%)`,
+    // BR: px,py → 100,py → 100,100 → px,100
+    `polygon(${px}% ${py}%, 100% ${py}%, 100% 100%, ${px}% 100%)`,
+  ];
+}
+
+// ── Build grid ───────────────────────────────────────────────
+function buildGrid() {
+  const grid = document.getElementById("results-grid");
+
+  SCENES.forEach(scene => {
+    const base = `./static/images/results/${scene.id}/`;
+
+    const card = document.createElement("div");
+    card.className = "result-card";
+
+    const wrap = document.createElement("div");
+    wrap.className = "quad-wrapper";
+
+    // Spacer (relative-positioned) gives the wrapper its height
+    const spacer = document.createElement("img");
+    spacer.className = "quad-spacer";
+    spacer.src = base + "original.png";
+    spacer.alt = "";
+    wrap.appendChild(spacer);
+
+    // 4 clipped images, all stacked absolutely
+    const imgs = QUADS.map(q => {
+      const img = document.createElement("img");
+      img.src   = base + q.file + ".png";
+      img.alt   = q.label;
+      img.className = "q-img";
+      // default: equal quadrants at 50/50
+      wrap.appendChild(img);
+      return img;
+    });
+
+    // Crosshair overlay with moving lines
+    const ch = document.createElement("div");
+    ch.className = "quad-crosshair";
+    ch.innerHTML = `
+      <div class="ch-hline"></div>
+      <div class="ch-vline"></div>
+      <span class="ql tl">${QUADS[0].label}</span>
+      <span class="ql tr">${QUADS[1].label}</span>
+      <span class="ql bl">${QUADS[2].label}</span>
+      <span class="ql br">${QUADS[3].label}</span>
+    `;
+    wrap.appendChild(ch);
+
+    const hline = ch.querySelector(".ch-hline");
+    const vline = ch.querySelector(".ch-vline");
+
+    function applyClips(px, py) {
+      const c = clips(px, py);
+      imgs.forEach((img, i) => { img.style.clipPath = c[i]; });
+      hline.style.top  = py + "%";
+      vline.style.left = px + "%";
+    }
+
+    // Default position defined per-scene
+    applyClips(scene.initX, scene.initY);
+
+    wrap.addEventListener("mousemove", e => {
+      const rect = wrap.getBoundingClientRect();
+      const px = ((e.clientX - rect.left) / rect.width  * 100);
+      const py = ((e.clientY - rect.top)  / rect.height * 100);
+      applyClips(px, py);
+    });
+
+    // On leave, revert to per-scene default
+    wrap.addEventListener("mouseleave", () => applyClips(scene.initX, scene.initY));
+
+    // Caption
+    const caption = document.createElement("div");
+    caption.className = "card-caption";
+    caption.textContent = scene.caption;
+
+    card.appendChild(wrap);
+    card.appendChild(caption);
+    grid.appendChild(card);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", buildGrid);
+</script>
 
 </body>
 </html>
