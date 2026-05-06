@@ -533,6 +533,80 @@
 </section>
 
 
+<!-- ─────────────────────── RCS DILATION SWEEP ─────────────────────── -->
+<section class="section" style="background:#f8f8f8;">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">RCS Dilation Parameter Sweep</h2>
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+        <div class="content has-text-justified">
+          <p>
+            The RCS mask is built by dilating sparse MASt3R correspondences and intersecting with
+            the mirror region. We sweep dilation <strong>radius</strong> (0–8) and
+            <strong>iteration count</strong> on the 15 Blender scenes, scoring each configuration
+            against the ground-truth constraint mask via F<sub>0.5</sub>
+            (β&nbsp;=&nbsp;0.5, weighting precision 4× over recall).
+            The selected operating point is <strong>radius&nbsp;=&nbsp;4, iterations&nbsp;=&nbsp;1</strong>
+            (precision&nbsp;0.87, recall&nbsp;0.74, F<sub>0.5</sub>&nbsp;=&nbsp;0.85).
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Precision-Recall curve -->
+    <div class="columns is-centered mt-4">
+      <div class="column is-half has-text-centered">
+        <img src="./static/images/rcs_dilation_sweep/precision_recall_i1.png"
+             alt="RCS Precision-Recall curve"
+             style="width:100%; border-radius:8px;">
+        <p class="mt-2" style="font-size:.88rem; color:#555;">
+          Mean precision–recall curve across all 15 Blender scenes (iterations&nbsp;=&nbsp;1).
+          Each point corresponds to one dilation radius; red marks the selected radius&nbsp;=&nbsp;4.
+        </p>
+      </div>
+    </div>
+
+    <!-- Per-radius overlay grid for sample 0 -->
+    <h3 class="title is-5 has-text-centered mt-5">Per-Radius Overlays (Sample 0, iterations = 1)</h3>
+    <p class="has-text-centered mb-3" style="font-size:.88rem; color:#555;">
+      Red overlay = estimated geometrically-constrained mirror pixels. GT = ground-truth mask.
+    </p>
+    <div class="columns is-centered is-multiline" style="flex-wrap:wrap;">
+      <div class="column is-narrow has-text-centered" style="padding:6px;">
+        <img src="./static/images/rcs_dilation_sweep/sample_0/overlay_gt.png"
+             alt="GT mask" style="width:160px; border-radius:6px; border:2px solid #888;">
+        <p style="font-size:.82rem; margin-top:4px;">Ground truth</p>
+      </div>
+      <div class="column is-narrow has-text-centered" style="padding:6px;">
+        <img src="./static/images/rcs_dilation_sweep/sample_0/overlay_r0_i1.png"
+             alt="r=0" style="width:160px; border-radius:6px;">
+        <p style="font-size:.82rem; margin-top:4px;">radius = 0</p>
+      </div>
+      <div class="column is-narrow has-text-centered" style="padding:6px;">
+        <img src="./static/images/rcs_dilation_sweep/sample_0/overlay_r2_i1.png"
+             alt="r=2" style="width:160px; border-radius:6px;">
+        <p style="font-size:.82rem; margin-top:4px;">radius = 2</p>
+      </div>
+      <div class="column is-narrow has-text-centered" style="padding:6px;">
+        <img src="./static/images/rcs_dilation_sweep/sample_0/overlay_r4_i1.png"
+             alt="r=4" style="width:160px; border-radius:6px; border:2px solid #e74c3c;">
+        <p style="font-size:.82rem; margin-top:4px; color:#e74c3c; font-weight:bold;">radius = 4 ✓</p>
+      </div>
+      <div class="column is-narrow has-text-centered" style="padding:6px;">
+        <img src="./static/images/rcs_dilation_sweep/sample_0/overlay_r6_i1.png"
+             alt="r=6" style="width:160px; border-radius:6px;">
+        <p style="font-size:.82rem; margin-top:4px;">radius = 6</p>
+      </div>
+      <div class="column is-narrow has-text-centered" style="padding:6px;">
+        <img src="./static/images/rcs_dilation_sweep/sample_0/overlay_r8_i1.png"
+             alt="r=8" style="width:160px; border-radius:6px;">
+        <p style="font-size:.82rem; margin-top:4px;">radius = 8</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
 <!-- ─────────────────────── BIBTEX ─────────────────────── -->
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
