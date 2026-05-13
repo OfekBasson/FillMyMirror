@@ -292,7 +292,7 @@
             Our key insight is that much of the mirror content is geometrically constrained by the visible scene and therefore does not need to be hallucinated. We estimate scene geometry and project visible content into the mirror to recover reflection regions that are deterministically determined by geometry. A generative model is then applied to complete the mirror region using a two-mask diffusion strategy that balances geometry-preserving constraints with the model's learned priors, reducing projection artifacts and improving reflection consistency. The method is <b>training-free</b> and applicable to complex real-world scenes.
           </p>
           <p>
-            We evaluate our approach on synthetic scenes and on real captured images. Using standard metrics and a newly introduced geometry-aware reflection consistency evaluation, we show that explicitly incorporating scene geometry leads to more consistent and perceptually preferred mirrors.
+            We evaluate our approach on MirrorBench-v2, a public benchmark, as well as on real captured images. Using standard metrics and a new geometry-aware reflection consistency evaluation, we show that explicitly incorporating scene geometry leads to more geometrically consistent mirrors.
           </p>
         </div>
       </div>
@@ -325,7 +325,7 @@
         <div class="method-step">
           <div class="step-number">01</div>
           <h3 class="title is-5 mt-2">Geometry Estimation &amp; Projection</h3>
-          <p>We use MoGe-v2 to reconstruct a 3D mesh and camera parameters from the single input image.
+          <p>We use a monocular geometry estimator to reconstruct a 3D mesh and camera parameters from the single input image.
           The mirror plane is estimated by fitting a plane to the masked region. The scene is then
           reflected across this plane and rendered — recovering every mirror pixel whose content is
           deterministically constrained by scene geometry.</p>
@@ -390,10 +390,10 @@
     <h2 class="title is-3 has-text-centered">Quantitative Results</h2>
 
     <!-- Table 1 -->
-    <h3 class="title is-4 mt-4">Synthetic Scenes — with Ground-Truth Geometry</h3>
+    <h3 class="title is-4 mt-4">Synthetic Scenes (MirrorBench-V2) — with Ground-Truth Geometry</h3>
     <p class="mb-3" style="font-size:.9rem;">
-      Evaluated over the full image, all mirror pixels, and the <em>geometrically constrained</em>
-      mirror subset. Upper block: no GT geometry at inference. Lower block: GT geometry used.
+      Metrics reported over all mirror pixels and the <em>geometrically constrained</em>
+      mirror subset, identified using ground-truth geometry.
     </p>
     <div class="table-container">
       <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth metric-table">
@@ -401,12 +401,10 @@
           <tr>
             <th rowspan="2">Method</th>
             <th rowspan="2">Geometry Source</th>
-            <th>Full Image</th>
-            <th colspan="3">Full Mirror</th>
+            <th colspan="3">Full Mirror Metrics</th>
             <th colspan="3">Constrained Mirror Pixels</th>
           </tr>
           <tr>
-            <th>CLIP↑</th>
             <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
             <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
           </tr>
@@ -414,29 +412,24 @@
         <tbody>
           <tr>
             <td>Qwen-Image-Edit</td><td>✗</td>
-            <td>0.30</td><td>13.70</td><td>0.51</td><td>0.06</td><td>14.11</td><td>0.51</td><td>0.04</td>
+            <td>9.27</td><td>0.253</td><td>0.344</td><td>10.59</td><td>0.242</td><td>0.120</td>
+          </tr>
+          <tr>
+            <td>MirrorFusion 2.0</td><td>GT</td>
+            <td>9.89</td><td>0.254</td><td>0.275</td><td>10.75</td><td>0.239</td><td>0.059</td>
           </tr>
           <tr>
             <td>FLUX.1 Fill</td><td>✗</td>
-            <td>0.31</td><td>13.61</td><td>0.51</td><td>0.07</td><td>14.38</td><td>0.51</td><td>0.04</td>
-          </tr>
-          <tr class="ours-row">
-            <td>Ours</td><td>Est.</td>
-            <td>0.30</td><td><b>14.74</b></td><td><b>0.54</b></td><td><b>0.05</b></td>
-            <td><b>14.89</b></td><td><b>0.54</b></td><td><b>0.03</b></td>
-          </tr>
-          <tr style="border-top:2px solid #bbb;">
-            <td>MirrorFusion 2.0</td><td>GT</td>
-            <td>0.31</td><td>10.60</td><td>0.32</td><td>0.10</td><td>10.00</td><td>0.30</td><td>0.07</td>
+            <td>13.21</td><td>0.372</td><td>0.224</td><td>14.87</td><td>0.315</td><td>0.037</td>
           </tr>
           <tr>
-            <td>Qwen-Image-Edit</td><td>GT</td>
-            <td>0.30</td><td>13.36</td><td>0.54</td><td>0.06</td><td>13.88</td><td>0.54</td><td>0.04</td>
+            <td>Ours</td><td>Est.</td>
+            <td>13.81</td><td>0.378</td><td>0.221</td><td>16.35</td><td>0.367</td><td>0.032</td>
           </tr>
           <tr class="ours-row">
             <td>Ours</td><td>GT</td>
-            <td>0.30</td><td><b>17.14</b></td><td><b>0.64</b></td><td><b>0.05</b></td>
-            <td><b>18.39</b></td><td><b>0.67</b></td><td><b>0.03</b></td>
+            <td><b>14.42</b></td><td><b>0.437</b></td><td><b>0.194</b></td>
+            <td><b>21.92</b></td><td><b>0.586</b></td><td><b>0.016</b></td>
           </tr>
         </tbody>
       </table>
@@ -445,19 +438,17 @@
     <!-- Table 2 -->
     <h3 class="title is-4 mt-6">Real Images — no Ground-Truth Geometry</h3>
     <p class="mb-3" style="font-size:.9rem;">
-      Constrained mirror pixels are identified via our Reflection Consistency Score (RCS).
+      Constrained mirror pixels are identified via our Reflection Consistency Score (RCS), which isolates mirror regions whose appearance is geometrically constrained by visible scene content.
     </p>
     <div class="table-container">
       <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth metric-table">
         <thead>
           <tr>
             <th rowspan="2">Method</th>
-            <th>Full Image</th>
-            <th colspan="3">Full Mirror</th>
+            <th colspan="3">Full Mirror Metrics</th>
             <th colspan="3">Constrained Mirror Pixels (RCS)</th>
           </tr>
           <tr>
-            <th>CLIP↑</th>
             <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
             <th>PSNR↑</th><th>SSIM↑</th><th>LPIPS↓</th>
           </tr>
@@ -465,24 +456,24 @@
         <tbody>
           <tr>
             <td>MirrorFusion 2.0</td>
-            <td>0.30</td><td>9.22</td><td>0.32</td><td>0.14</td><td>9.98</td><td>0.33</td><td>0.06</td>
+            <td>10.05</td><td>0.390</td><td>0.131</td><td>10.18</td><td>0.377</td><td>0.072</td>
           </tr>
           <tr>
             <td>Qwen-Image-Edit</td>
-            <td>0.30</td><td>12.83</td><td>0.49</td><td>0.10</td><td>13.44</td><td>0.48</td><td>0.04</td>
+            <td>10.44</td><td>0.365</td><td>0.128</td><td>10.29</td><td>0.344</td><td>0.073</td>
           </tr>
           <tr>
             <td>FLUX.1 Fill</td>
-            <td>0.31</td><td>13.31</td><td>0.48</td><td>0.11</td><td>13.68</td><td>0.46</td><td>0.04</td>
+            <td>13.42</td><td>0.472</td><td>0.106</td><td>13.80</td><td>0.457</td><td>0.053</td>
           </tr>
           <tr>
-            <td>Ours (no interp.)</td>
-            <td>0.30</td><td>13.61</td><td>0.50</td><td>0.11</td><td>14.50</td><td>0.50</td><td>0.04</td>
+            <td>Ours (no interpolation)</td>
+            <td>13.51</td><td>0.477</td><td>0.105</td><td>14.54</td><td>0.481</td><td>0.050</td>
           </tr>
           <tr class="ours-row">
-            <td>Ours</td>
-            <td>0.30</td><td><b>13.66</b></td><td><b>0.50</b></td><td>0.11</td>
-            <td><b>14.54</b></td><td><b>0.50</b></td><td>0.04</td>
+            <td>Ours (with interpolation)</td>
+            <td><b>13.62</b></td><td><b>0.484</b></td><td><b>0.104</b></td>
+            <td><b>14.72</b></td><td><b>0.489</b></td><td><b>0.049</b></td>
           </tr>
         </tbody>
       </table>
@@ -577,8 +568,6 @@ const SCENES = [
   { id: "scene07", caption: "A mirror reflects a wicker basket with a black bag on it, and above it a wall shelf with plants and a portable air conditioner",                              initX: 80, initY: 32 },
   { id: "scene08", caption: "A mirror reflects a wooden cabinet and candles, in a room with wall art and chair",                                                                            initX: 65, initY: 59 },
   { id: "scene09", caption: "A mirror reflects towels and a window, in a room with toilet, plant, toiletries, toothbrushes, and a watch holder",                                          initX: 85, initY: 50 },
-  { id: "scene12", caption: "A rectangular mirror near shelves of eyeglasses reflects lights and image in an eyewear store",                                                               initX: 47, initY: 42 },
-  { id: "scene14", caption: "Large cardboard barrels are reflected in a wall mirror near a door which stands below a plant and cups",                                                      initX: 84, initY: 64 },
 ];
 
 // Quadrant layout (positions relative to mouse):
